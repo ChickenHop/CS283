@@ -21,6 +21,7 @@ int setup_buff(char *buff, char *user_str, int len){
     int space=0; // 0 means that there was no prevoius space 1 means that there was a prevoius space
     char *temp = user_str; 
     int user_len = 0;
+    //gets the lenght of user string
     while (*temp != '\0'){
         user_len++;
         temp++;
@@ -49,6 +50,7 @@ int setup_buff(char *buff, char *user_str, int len){
             buff++;
            
         }
+        // adds every other charater to the buffer string
         else {
             *buff = *user_str;
             space = 0;
@@ -59,6 +61,7 @@ int setup_buff(char *buff, char *user_str, int len){
         }
         user_str++;
     }
+    // adds to . to pad out buffer
     while (i < len){
         *buff= '.';
         buff++;
@@ -82,10 +85,13 @@ void usage(char *exename){
 
 int count_words(char *buff, int len, int str_len){
     int word_count=0;
+
     for (int i = 0; i < len; i++){
+        // when sees space add 1 to word count
         if(*buff == ' '){
             word_count++;
         }
+        // when sees dot add 1 to word count then break loop
         if (*buff == '.'){
             word_count++;
             return word_count;
@@ -102,18 +108,19 @@ void count_chars(char *buff, int len, int str_len) {
     int new_word = 1; // if new word equal 1 if not equals 0
 
     for (i = 0; i < len; i++) {
-        // 
+        // make a new line for each word
         if (new_word) {
             printf("\n"); // put here to fix bug where after the frist word line all the others were offset by 1 space
             printf("%d. ", word_count);
             new_word = 0;
             char_count = 0;
         }
-
+        // when sees space add 1 to word count then break loop
         if (*buff == ' ') {
             printf(" (%d)", char_count);
             word_count++;
             new_word = 1;
+        // when sees dot add 1 to word count then break loop
         } else if (*buff == '.') { 
             printf(" (%d)", char_count);
             break; 
@@ -191,6 +198,7 @@ int main(int argc, char *argv[]){
 //TODO:  #5 Implement the other cases for 'r' and 'w' by extending
         case 'r':
             printf("Reversed string: ");
+            // uses the user str lenght as the index and increments down
             for (int i= user_str_len-1; i >=0; i--){
                 putchar(*(buff+i));
             }
@@ -219,5 +227,7 @@ int main(int argc, char *argv[]){
 //          do you think providing both the pointer and the length
 //          is a good practice, after all we know from main() that 
 //          the buff variable will have exactly 50 bytes?
-//  
-//          PLACE YOUR ANSWER HERE
+//          
+//          It allows for flexibilty so if we want to change the buffer to a different number
+//          it will not cause unrelated bugs and we won't need to change any other part of the code.
+//          It is also more readable as a dev may not remeber why there is a random number being used in the helper function but will know if it is labled.
