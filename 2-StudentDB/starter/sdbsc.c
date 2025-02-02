@@ -65,7 +65,7 @@ int get_student(int fd, int id, student_t *s)
     if (fd  < 0){
         return ERR_DB_FILE;
     }
-    //check if id valid
+    
     if ((id < MIN_STD_ID) || (id > MAX_STD_ID)){
         return SRCH_NOT_FOUND;
     }
@@ -122,10 +122,6 @@ int add_student(int fd, int id, char *fname, char *lname, int gpa) {
     student_t student = {0};
     int result = get_student(fd, id, &student);
     int offset = id * STUDENT_RECORD_SIZE;
-    if (offset >= SIZE_MAX) {
-        printf("Invalid student ID: %d\n", id);
-        return ERR_DB_OP;
-    }
     if (result == ERR_DB_FILE) {
         printf(M_ERR_DB_READ);
         return ERR_DB_FILE;
