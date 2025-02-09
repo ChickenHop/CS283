@@ -50,48 +50,35 @@ int build_cmd_list(char *cmd_line, command_list_t *clist) {
     int cmd_cnt = 0;
 
     while (cmd != NULL) {
-        //printf("Processing command %d: %s\n", cmd_cnt + 1, cmd);
         if (cmd_cnt == CMD_MAX) {
-            //printf("Error: Too many commands\n");
             return ERR_TOO_MANY_COMMANDS;
         }
-
         while (*cmd == SPACE_CHAR) {
             cmd++;  
         }
-
         char *end = cmd + strlen(cmd) - 1;
         while (end > cmd && *end == SPACE_CHAR) {
             end--;
         }
         end[1] = '\0';
 
-       //printf("Trimmed command: '%s'\n", cmd);
-
         char *token = strtok_r(cmd, SPACE_STRING, &ptr2);
-       //printf("Executable: %s\n", token);
 
         if (strlen(token) > EXE_MAX){
-            //printf("Error: Command or arguments too big\n");
             return ERR_CMD_OR_ARGS_TOO_BIG;
         }
         strcpy(clist->commands[cmd_cnt].exe, token);
-        //strcpy(clist->commands[cmd_cnt].args, "GARBAGE");
         while ((token = strtok_r(NULL, SPACE_STRING, &ptr2)) != NULL) {
             if (strlen(clist->commands[cmd_cnt].args) + strlen(token) + 1 > ARG_MAX) {
                 return ERR_CMD_OR_ARGS_TOO_BIG;
             }
-            //printf("Argument: %s\n", token);
             strcat(clist->commands[cmd_cnt].args, token);
             strcat(clist->commands[cmd_cnt].args, " ");
-        }
-        
+        }    
         cmd_cnt++;
         cmd = strtok_r(NULL, PIPE_STRING, &ptr1);
-        
     }
 
     clist->num = cmd_cnt;
-    //printf("Number of commands parsed: %d\n", cmd_cnt);
     return OK;
 }

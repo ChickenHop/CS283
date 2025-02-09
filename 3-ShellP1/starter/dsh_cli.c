@@ -1,9 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <unistd.h>
+
 #include "dshlib.h"
 
 /*
@@ -47,24 +45,18 @@
  *  See the provided test cases for output expectations.
  */
 void dragon(const char *filename) {
-    int fd = open(filename, O_RDONLY);
-    if (fd == -1) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
         perror("Error opening file");
         return;
     }
 
-    char buffer[1024];
-    ssize_t bytes_read;
-    while ((bytes_read = read(fd, buffer, sizeof(buffer) - 1)) > 0) {
-        buffer[bytes_read] = '\0'; // Null-terminate the buffer
+    char buffer[1024];  // Adjust buffer size as needed
+    while (fgets(buffer, sizeof(buffer), file) != NULL) {
         printf("%s", buffer);
     }
-
-    if (bytes_read == -1) {
-        perror("Error reading file");
-    }
     printf("\n");
-    close(fd);
+    fclose(file);
 }
 
 int main(){
