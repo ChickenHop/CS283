@@ -13,8 +13,8 @@
 typedef struct cmd_buff
 {
     int  argc;
-    char argv[CMD_MAX][ARG_MAX];
-    char cmd[EXE_MAX];
+    char *argv[CMD_ARGV_MAX];
+    char *_cmd_buffer;
 } cmd_buff_t;
 
 /* WIP - Move to next assignment 
@@ -63,7 +63,7 @@ typedef enum {
     BI_RC,
 } Built_In_Cmds;
 Built_In_Cmds match_command(const char *input); 
-Built_In_Cmds exec_built_in_cmd(cmd_buff_t *cmd);
+Built_In_Cmds exec_built_in_cmd(cmd_buff_t *cmd,Built_In_Cmds command);
 
 //main execution context
 int exec_local_cmd_loop();

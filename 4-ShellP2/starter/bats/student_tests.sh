@@ -14,9 +14,36 @@ EOF
 }
 
 
-@test "Simple Command" {
+@test "Exit Command" {
     run ./dsh <<EOF                
-test_command
+exit
+EOF
+    # Assertions
+    [ "$status" -eq 0 ]
+
+}
+
+@test "cd commad" {
+    initial_dir=$(pwd)
+    run ./dsh <<EOF
+cd
+pwd
+EOF
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"$initial_dir"* ]]
+}
+
+@test "cd /tmp command pass" {
+    run ./dsh <<EOF
+cd /tmp
+pwd
+EOF
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"/tmp"* ]]
+}
+@test "Dragon provided" {
+    run ./dsh <<EOF                
+dragon
 exit
 EOF
 
@@ -24,13 +51,13 @@ EOF
     stripped_output=$(echo "$output" | tr -d '[:space:]')
 
     # Expected output with all whitespace removed for easier matching
-    expected_output="dsh2>dsh2>cmdloopreturned0"
+    expected_output="dsh2>@%%%%%%%%%%%%%%%%%%%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%%%%%%%%%%%%@%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%%%%%%@%%%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%%%%%%%%%%%%%%%%%%%%@%%%%%%%%%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%%@%%%%%%%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@@%%%%%%%%%%%%%%%%%%%%%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%%@%%%%%%%%%%%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%@%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%%%%%%%@dsh2>"
 
     # These echo commands will help with debugging and will only print
     #if the test fails
     echo "Captured stdout:" 
     echo "Output: $stripped_output"
-    echo "Expected $expected_output"
+    echo "Expected: $expected_output"
     echo "Exit Status: $status"
 
     # Check exact match
@@ -40,34 +67,6 @@ EOF
     [ "$status" -eq 0 ]
 
 }
-
-@test "Simple Command with Args" {
-    run ./dsh <<EOF                
-cmd -a1 -a2
-exit
-EOF
-
-    # Strip all whitespace (spaces, tabs, newlines) from the output
-    stripped_output=$(echo "$output" | tr -d '[:space:]')
-
-    # Expected output 
-    expected_output="dsh2>dsh2>cmdloopreturned0"
-
-    # These echo commands will help with debugging and will only print
-    #if the test fails
-    echo "Captured stdout:" 
-    echo "Output: $stripped_output"
-    echo "Expected $expected_output"
-    echo "Exit Status: $status"
-
-    # Check exact match
-    [ "$stripped_output" = "$expected_output" ]
-
-    # Assertions
-    [ "$status" -eq 0 ]
-
-}
-
 @test "No command provided" {
     run ./dsh <<EOF                
 
@@ -78,7 +77,7 @@ EOF
     stripped_output=$(echo "$output" | tr -d '[:space:]')
 
     # Expected output with all whitespace removed for easier matching
-    expected_output="dsh2>warning:nocommandsprovidedcmdloopreturned-1"
+    expected_output="dsh2>warning:nocommandsprovideddsh2>"
 
     # These echo commands will help with debugging and will only print
     #if the test fails

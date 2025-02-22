@@ -8,7 +8,6 @@
 #include <sys/wait.h>
 #include "dshlib.h"
 #include "dragon.h"
-
 /*
  * Implement your exec_local_cmd_loop function by building a loop that prompts the 
  * user for input.  Use the SH_PROMPT constant from dshlib.h and then
@@ -52,124 +51,190 @@
  *  Standard Library Functions You Might Want To Consider Using (assignment 2+)
  *      fork(), execvp(), exit(), chdir()
  */
-int parse(char *line, cmd_buff_t *buff) {
-   // printf("enter parse\n");
-    char temp[ARG_MAX];
-    
-    while (*line == SPACE_CHAR) {
-        line++;  
+int alloc_cmd_buff(cmd_buff_t *cmd_buff) {
+    cmd_buff->_cmd_buffer = malloc(SH_CMD_MAX);
+    if (cmd_buff->_cmd_buffer == NULL) {
+        return ERR_MEMORY;
     }
-    
-    char *end = line + strlen(line) - 1;
-    while (end > line && *end == SPACE_CHAR) {
-        end--;
+    cmd_buff->argc = 0;
+    for (int i = 0; i < CMD_ARGV_MAX; i++) {
+        cmd_buff->argv[i] = NULL;
     }
-    end[1] = '\0';
-    memset(buff, 0, sizeof(cmd_buff_t)); 
+    return OK;
+}
 
-    char *ptr1;
-    char *cmd = strtok_r(line, SPACE_STRING, &ptr1);
-    
+int free_cmd_buff(cmd_buff_t *cmd_buff) {
+    free(cmd_buff->_cmd_buffer);
+    cmd_buff->_cmd_buffer = NULL;
+    return OK;
+}
 
-    if (strlen(cmd) > EXE_MAX) {
-        return ERR_CMD_OR_ARGS_TOO_BIG;
+int clear_cmd_buff(cmd_buff_t *cmd_buff) {
+    memset(cmd_buff->_cmd_buffer, 0, SH_CMD_MAX * sizeof(char));
+    for (int i = 0; i < CMD_ARGV_MAX; i++) {
+        cmd_buff->argv[i] = NULL;
+    }
+    cmd_buff->argc = 0;
+    return OK;
+}
+
+int build_cmd_buff(char *cmd_line, cmd_buff_t *cmd_buff) {
+    clear_cmd_buff(cmd_buff);
+    strncpy(cmd_buff->_cmd_buffer, cmd_line, SH_CMD_MAX - 1);
+    cmd_buff->_cmd_buffer[SH_CMD_MAX - 1] = '\0';
+
+    char *token = cmd_buff->_cmd_buffer;
+    int argc = 0;
+
+    while (*token != '\0') {
+        // Skip leading spaces
+        while (isspace((unsigned char)*token)) {
+            token++;
+        }
+        if (*token == '\0') {
+            break;
+        }
+
+        char *arg_start;
+        if (*token == '"') { 
+            token++; 
+            arg_start = token;
+            while (*token != '"' && *token != '\0') {
+                token++;
+            }
+            if (*token == '"') {
+                *token = '\0'; 
+                token++;      
+            }
+        } else {  
+            arg_start = token;
+            while (*token != '\0' && !isspace((unsigned char)*token)) {
+                token++;
+            }
+            if (*token != '\0') {
+                *token = '\0'; 
+                token++;
+            }
+        }
+
+        cmd_buff->argv[argc++] = arg_start;
+
+        if (argc >= CMD_ARGV_MAX - 1) {
+            return ERR_CMD_OR_ARGS_TOO_BIG;
+        }
     }
 
-    strcpy(buff->cmd, cmd);
-   // printf("command:%s\n",buff->cmd);
-   
-    int i = 0;
-    if (strcmp(cmd,"echo")==0){
-        cmd = strtok_r(NULL, "\"", &ptr1);
-        strcpy(buff->argv[i], cmd);
-        return OK;
-    }
-    cmd = strtok_r(NULL, SPACE_STRING, &ptr1);
-  //  printf("next:%s\n",cmd);
-    while (cmd != NULL) {
-        strcpy(buff->argv[i], cmd);
-       //printf("arg:%s\n",buff->argv[i]);
-        i++;
-        cmd = strtok_r(NULL, SPACE_STRING, &ptr1);
-    }
-    buff->argc=i;
-   // printf("%d\n",buff->argc);
-   // printf("done\n");
+    cmd_buff->argv[argc] = NULL;
+    cmd_buff->argc = argc;
+
     return OK;
 }
 
 
-int command_handler(cmd_buff_t *buff){
-    if (strcmp(buff->cmd,"cd")==0){
-        if (buff->argc==0){
-            return -1; 
-        }
-        else if (buff->argc == 1) {
-            chdir(buff->argv[0]);
-            return 0;
-        } 
-        else {
-            return -1; 
-        }
+Built_In_Cmds match_command(const char *input) {
+    if (strcmp(input, EXIT_CMD) == 0) {
+        return BI_CMD_EXIT;
+    } else if (strcmp(input, "cd") == 0) {
+        return BI_CMD_CD;
+    } else if (strcmp(input, "dragon") == 0) {
+        return BI_CMD_DRAGON;
     }
-    else if (strcmp(buff->cmd,"pwd")==0){
-        char cwd[ARG_MAX];
-        getcwd(cwd, sizeof(cwd));
-        printf("%s\n", cwd);
-    }
-    else if (strcmp(buff->cmd,"dragon")==0){
-        print_dragon();
-    }
-    else if (strcmp(buff->cmd,"echo")==0){
-        printf("%s\n",buff->argv[0]);
+    return BI_NOT_BI;
+}
+
+Built_In_Cmds exec_built_in_cmd(cmd_buff_t *cmd, Built_In_Cmds command) {
+    switch (command) {
+        case BI_CMD_EXIT:
+            exit(OK);
+        case BI_CMD_CD:
+            if (cmd->argc > 1) {
+                if (chdir(cmd->argv[1]) != 0) {
+                    fprintf(stderr, "cd: %s: No such file or directory\n", cmd->argv[1]);
+                }
+            }
+            return BI_EXECUTED;
+        case BI_CMD_DRAGON:
+            print_dragon();
+            return BI_CMD_DRAGON;
+        default:
+            return BI_NOT_BI;
     }
 }
 
-int exec_local_cmd_loop(){
-    char cmd_buff[SH_CMD_MAX];
-    int rc = 0;
+int exec_cmd(cmd_buff_t *cmd) {
+    pid_t pid = fork();
+    int status;
+
+    if (pid == 0) {
+        execvp(cmd->argv[0], cmd->argv);
+        perror("execvp failed");
+        exit(ERR_EXEC_CMD);
+    } else if (pid > 0) {
+        if (waitpid(pid, &status, 0) == -1) {
+            perror("waitpid failed");
+            return ERR_EXEC_CMD;
+        }
+        if (WIFEXITED(status)) {
+            return WEXITSTATUS(status);
+        }
+        return ERR_EXEC_CMD;
+    } else {
+        perror("fork failed");
+        return ERR_EXEC_CMD;
+    }
+}
+
+int exec_local_cmd_loop() {
+    char *cmd_buff = malloc(SH_CMD_MAX * sizeof(char));
+    if (cmd_buff == NULL) {
+        fprintf(stderr, "Memory allocation failed.\n");
+        return ERR_MEMORY;
+    }
+
+    int rc;
     cmd_buff_t cmd;
-    int exit;
-    while(1){
+    Built_In_Cmds bi;
+    if (alloc_cmd_buff(&cmd) == ERR_MEMORY) {
+        fprintf(stderr, "Memory allocation failed.\n");
+        free(cmd_buff);
+        return ERR_MEMORY;
+    }
+
+    while (1) {
         printf("%s", SH_PROMPT);
-        if (fgets(cmd_buff, ARG_MAX, stdin) == NULL){
+        if (fgets(cmd_buff, SH_CMD_MAX, stdin) == NULL) {
             printf("\n");
-            return OK;
             break;
         }
-        cmd_buff[strcspn(cmd_buff,"\n")] = '\0';
-
-        if (strcmp(cmd_buff,EXIT_CMD)==0){ 
-            rc = OK;
-            return rc;
-        }
-        if (cmd_buff == NULL || strlen(cmd_buff)==0) {
-            printf("%s\n", CMD_WARN_NO_CMD);
-            rc = WARN_NO_CMDS;
-            return rc;
+        cmd_buff[strcspn(cmd_buff, "\n")] = '\0';
+        if (strlen(cmd_buff) == 0) {
+            printf("%s", CMD_WARN_NO_CMD);
+            continue;
         }
         if (strlen(cmd_buff) >= SH_CMD_MAX) {
-            rc=ERR_CMD_OR_ARGS_TOO_BIG;
+            printf("%s", CMD_ERR_PIPE_LIMIT);
+            continue;
         }
-        int result = parse(cmd_buff,&cmd);
-        switch (result) {
-            case ERR_CMD_OR_ARGS_TOO_BIG:
-                rc = ERR_CMD_OR_ARGS_TOO_BIG;
-                return rc;
-            case OK:
-                exit = command_handler(&cmd);
 
+        rc = build_cmd_buff(cmd_buff, &cmd);
+        switch (rc) {
+            case ERR_CMD_OR_ARGS_TOO_BIG:
+                fprintf(stderr, "Too many arguments\n");
+                break;
+            case OK:
+                bi = match_command(cmd.argv[0]);
+                if (bi != BI_NOT_BI) {
+                    exec_built_in_cmd(&cmd, bi);
+                } else {
+                    exec_cmd(&cmd);
+                }
+                break;
+            default:
+                break;
         }
     }
-    
+
+    free_cmd_buff(&cmd);
+    free(cmd_buff);
+    return rc;
 }
-    // TODO IMPLEMENT MAIN LOOP
-
-    // TODO IMPLEMENT parsing input to cmd_buff_t *cmd_buff
-
-    // TODO IMPLEMENT if built-in command, execute builtin logic for exit, cd (extra credit: dragon)
-    // the cd command should chdir to the provided directory; if no directory is provided, do nothing
-
-    // TODO IMPLEMENT if not built-in command, fork/exec as an external command
-    // for example, if the user input is "ls -l", you would fork/exec the command "ls" with the arg "-l"
-
