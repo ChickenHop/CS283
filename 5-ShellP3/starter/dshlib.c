@@ -6,8 +6,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/wait.h>
-#include "dshlib.h"
 #include "dragon.h"
+#include "dshlib.h"
 /*
  * Implement your exec_local_cmd_loop function by building a loop that prompts the 
  * user for input.  Use the SH_PROMPT constant from dshlib.h and then
@@ -129,6 +129,27 @@ int build_cmd_buff(char *cmd_line, cmd_buff_t *cmd_buff) {
     return OK;
 }
 
+int build_cmd_list(char *cmd_line, command_list_t *clist){
+    int count = 0;
+    int rc;
+    char *tok = strtok(cmd_line, PIPE_STRING);
+    while (tok != NULL) {
+        if (count == CMD_MAX) {
+            return ERR_TOO_MANY_COMMANDS;
+        }
+        alloc_cmd_buff(&clist->commands[count]);
+        clear_cmd_buff(&clist->commands[count]);
+        rc = build_cmd_buff(tok, &clist->commands[count]);
+        if (rc == ERR_CMD_OR_ARGS_TOO_BIG) {
+            return rc;
+        }
+        count++;
+        tok = strtok(NULL, PIPE_STRING);
+    }
+    clist->num = count;
+
+    return OK;
+}
 
 Built_In_Cmds match_command(const char *input) {
     if (strcmp(input, EXIT_CMD) == 0) {
@@ -183,6 +204,54 @@ int exec_cmd(cmd_buff_t *cmd) {
     }
 }
 
+int execute_pipeline(command_list_t *clist) {
+    int num_cmds = clist->num;
+    int pipefds[2 * (num_cmds - 1)];
+    pid_t pids[num_cmds];
+
+    for (int i = 0; i < num_cmds - 1; i++) {
+        if (pipe(pipefds + i * 2) < 0) {
+            perror("pipe failed");
+            return ERR_EXEC_CMD;
+        }
+    }
+    for (int i = 0; i < num_cmds; i++) {
+        pids[i] = fork();
+        if (pids[i] == 0) {
+            if (i > 0) {
+                dup2(pipefds[(i - 1) * 2], STDIN_FILENO);
+            }
+            if (i < num_cmds - 1) {
+                dup2(pipefds[i * 2 + 1], STDOUT_FILENO);
+            }
+            for (int j = 0; j < 2 * (num_cmds - 1); j++) {
+                close(pipefds[j]);
+            }
+            execvp(clist->commands[i].argv[0], clist->commands[i].argv);
+            perror("execvp failed");
+            exit(ERR_EXEC_CMD);
+        } else if (pids[i] < 0) {
+            perror("fork failed");
+            return ERR_EXEC_CMD;
+        }
+    }
+    for (int i = 0; i < 2 * (num_cmds - 1); i++) {
+        close(pipefds[i]);
+    }
+    for (int i = 0; i < num_cmds; i++) {
+        int status;
+        if (waitpid(pids[i], &status, 0) == -1) {
+            perror("waitpid failed");
+            return ERR_EXEC_CMD;
+        }
+        if (WIFEXITED(status) && WEXITSTATUS(status) != OK) {
+            return WEXITSTATUS(status);
+        }
+    }
+
+    return OK;
+}
+
 int exec_local_cmd_loop() {
     char *cmd_buff = malloc(SH_CMD_MAX * sizeof(char));
     if (cmd_buff == NULL) {
@@ -191,13 +260,8 @@ int exec_local_cmd_loop() {
     }
 
     int rc;
-    cmd_buff_t cmd;
+    command_list_t list;
     Built_In_Cmds bi;
-    if (alloc_cmd_buff(&cmd) == ERR_MEMORY) {
-        fprintf(stderr, "Memory allocation failed.\n");
-        free(cmd_buff);
-        return ERR_MEMORY;
-    }
 
     while (1) {
         printf("%s", SH_PROMPT);
@@ -211,21 +275,28 @@ int exec_local_cmd_loop() {
             continue;
         }
         if (strlen(cmd_buff) >= SH_CMD_MAX) {
-            printf("%s", CMD_ERR_PIPE_LIMIT);
+            printf("Command too big\n");
             continue;
         }
 
-        rc = build_cmd_buff(cmd_buff, &cmd);
+        rc = build_cmd_list(cmd_buff, &list);
         switch (rc) {
             case ERR_CMD_OR_ARGS_TOO_BIG:
-                fprintf(stderr, "Too many arguments\n");
+                printf("Command too big\n");
+                break;
+            case ERR_TOO_MANY_COMMANDS:
+                printf(CMD_ERR_PIPE_LIMIT,CMD_MAX);
                 break;
             case OK:
-                bi = match_command(cmd.argv[0]);
-                if (bi != BI_NOT_BI) {
-                    exec_built_in_cmd(&cmd, bi);
+                if (list.num == 1) {
+                    bi = match_command(list.commands[0].argv[0]);
+                    if (bi != BI_NOT_BI) {
+                        exec_built_in_cmd(&list.commands[0], bi);
+                    } else {
+                        exec_cmd(&list.commands[0]);
+                    }
                 } else {
-                    exec_cmd(&cmd);
+                    execute_pipeline(&list);
                 }
                 break;
             default:
@@ -233,7 +304,6 @@ int exec_local_cmd_loop() {
         }
     }
 
-    free_cmd_buff(&cmd);
     free(cmd_buff);
     return rc;
 }
