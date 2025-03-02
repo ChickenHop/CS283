@@ -132,8 +132,8 @@ int build_cmd_buff(char *cmd_line, cmd_buff_t *cmd_buff) {
 int build_cmd_list(char *cmd_line, command_list_t *clist){
     int count = 0;
     int rc;
-    char *tok = strtok(cmd_line, PIPE_STRING);
-    while (tok != NULL) {
+    char *token = strtok(cmd_line, PIPE_STRING);
+    while (token != NULL) {
         if (count == CMD_MAX) {
             return ERR_TOO_MANY_COMMANDS;
         }
